@@ -2,6 +2,7 @@
 set -e
 
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
+CODEX_AGENTS_MD="$HOME/.codex/AGENTS.md"
 CODEX_SKILL="$HOME/.codex/skills/karpathy-coding-guidelines/SKILL.md"
 
 GUIDELINES_BODY='Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
@@ -67,6 +68,38 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.'
 
+write_managed_block() {
+  local target_file="$1"
+  local title="$2"
+  local body="$3"
+  local begin_marker="<!-- BEGIN karpathy-coding-guidelines -->"
+  local end_marker="<!-- END karpathy-coding-guidelines -->"
+  local tmp_file
+
+  mkdir -p "$(dirname "$target_file")"
+  tmp_file="$(mktemp)"
+
+  if [ -f "$target_file" ]; then
+    awk -v begin="$begin_marker" -v end="$end_marker" '
+      $0 == begin { skip = 1; next }
+      $0 == end { skip = 0; next }
+      !skip { print }
+    ' "$target_file" > "$tmp_file"
+  else
+    : > "$tmp_file"
+  fi
+
+  {
+    cat "$tmp_file"
+    if [ -s "$tmp_file" ]; then
+      printf '\n\n'
+    fi
+    printf '%s\n# %s\n\n%s\n%s\n' "$begin_marker" "$title" "$body" "$end_marker"
+  } > "$target_file"
+
+  rm -f "$tmp_file"
+}
+
 # Claude Code global context
 mkdir -p "$(dirname "$CLAUDE_MD")"
 cat > "$CLAUDE_MD" <<EOF
@@ -75,6 +108,10 @@ cat > "$CLAUDE_MD" <<EOF
 $GUIDELINES_BODY
 EOF
 echo "Wrote $CLAUDE_MD"
+
+# Codex global context
+write_managed_block "$CODEX_AGENTS_MD" "Karpathy Coding Guidelines" "$GUIDELINES_BODY"
+echo "Wrote $CODEX_AGENTS_MD"
 
 # Codex skill
 mkdir -p "$(dirname "$CODEX_SKILL")"
